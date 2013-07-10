@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+import sys
+import array
+import usb.core
+import time
+import argparse
+
+class Ubertooth(object):
+    def __init__(self, device=True, infile=None, outfile=None):
+        if device:
+            self.device = self._init_device()
+        else:
+            self.device = None
+        
+        if infile:
+            self.infile = open(infile, 'rb') 
+        else:
+            infile=None
+
+    def _init_device(self):
+        device = usb.core.find(idVendor=0x1D50, idProduct=0x6002)
+        device.default_timeout=3000
+        device.set_configuration()
+        return device
+
+    def set_channel(self, channel=37):
+        self.device.ctrl_transfer(0x40, 12, 2402+channel, 0)
+    
+    def set_rx_mode(self, channel=None):
+        self.device.ctrl_transfer(0x40, 1, 0, 0)
+
+    def rx_file_stream(self, count=None, secs=None):
+        i = 0
+        start = time.time()
+        while True:
+            buffer = array.array('B')
+            try:
+                buffer.fromfile(self.infile, 68)
+            except:
+                break
+            if count != None: 
+                if i >= count:
+                    break
+                i += 1
+            if secs != None: 
+                if time.time() >= start+secs:
+                    break
+            yield buffer
+
+    def rx_stream(self, count=None, secs=None):
+        self.set_rx_mode()
+        i = 0
+        start = time.time()
+        while True:
+            buffer = self.device.read(0x82, 64)
+            if count != None: 
+                if i >= count:
+                    print i
+                    break
+                i += 1
+            if secs != None: 
+                if time.time() >= start+secs:
+                    break
+            yield buffer
+    
+    def close(self):
+        self.device.ctrl_transfer(0x40, 21)
+        self.device.ctrl_transfer(0x40, 13)
+
+def file_to_stdout(infile=None, count=None, secs=None):
+    ut = Ubertooth(device=False, infile=infile)
+    try:
+        for i in ut.rx_file_stream(count=count, secs=secs):
+            print i
+    except KeyboardInterrupt:
+        pass
+
+def ubertooth_rx_to_file(outfile=None, channel=37, count=None, secs=None):
+    ut = Ubertooth()
+    ut.set_channel(channel)
+    f = open(outfile,'wb')
+    try:
+        systime = array.array('B',[0,0,0,0])
+        for i in ut.rx_stream(count=count, secs=secs):
+            f.write(systime + i)
+    except KeyboardInterrupt:
+        pass
+    f.close()
+    ut.close()
+
+def CreateParser():
+    d = "Pure python interface to an ubertooth device"
+    parser = argparse.ArgumentParser(description=d)
+
+    parser.add_argument("-n", type=int, default=None,
+            help="how many usb packets to iterate before quiting")
+    parser.add_argument("-t", type=int, default=None,
+            help="how many seconds to read from usb device or file")
+    parser.add_argument("--channel", type=int, default=37,
+            help="What bluetooth channel to listen on (1-79)")
+    parser.add_argument("--infile", type=str, default=None,
+            help="read packets from an ubertooth dump file")
+    parser.add_argument("--outfile", type=str, default="ubertooth-dump.dump",
+            help="file to store ubertooth usb packets")
+    return parser.parse_args()
+
+def main(infile=None, outfile=None, channel=37, count=None, secs=None):
+    if infile:
+        file_to_stdout(infile=infile, count=count, secs=secs)
+    else:
+        ubertooth_rx_to_file(outfile=outfile, channel=channel, count=count, secs=secs)
+
+if __name__ == "__main__":
+    args = CreateParser()
+    main(infile=args.infile, outfile=args.outfile, channel=args.channel, count=args.n, secs=args.t)
