@@ -1,5 +1,20 @@
 #!/usr/bin/env python
 
+"""
+This (ppylibbtbb.py) is a pure python implementation of libbtbb.  It serves as
+standalone run-able application or as a library for python applications.  It is
+currently in its early stages and based off of the c library libbtbb and some
+of my ugly POC code github.com/hackgnar/lockdown_2013/src/alpha/pyut_alpha.py.
+
+TODO:
+    1) create argparse functionality for standalone mode
+    2) utilize the pure py BitVector lib (instead of my ugly bit arrays)
+    3) port over more functionality from my alpha code
+    4) implement more robust UAP features from c libbtbb
+    5) more code cleanup/refactor
+    6) implement more c libbtbb features
+"""
+
 DEFAULT_AC=0xcc7b7268ff614e1b
 
 DEFAULT_CODEWORD=0xb0000002c7820e7e

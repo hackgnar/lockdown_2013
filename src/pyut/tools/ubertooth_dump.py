@@ -1,3 +1,12 @@
+"""
+A simple pure python script to dump data from an ubertooth into a file.  The
+dump format is compatible with the ubertooth-rx tool.  This allows for data to
+be collected in python and parsed with the core ubertooth libraries.
+
+To dump data from an ubertooth to a file:
+python ubertooth_dump.py dump_filename.dump
+"""
+
 import sys
 import array
 import usb.core
