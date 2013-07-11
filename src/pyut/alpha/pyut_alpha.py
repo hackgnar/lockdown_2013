@@ -1,3 +1,24 @@
+"""
+WARNING: This code is a white hot mess. Read at your own risk!!!
+
+This file (pyut_alpha.py) is POC python code for interacting with an ubertooth
+device in multiple ways.  Its main purpose was to test a pure python
+implementation of libbtbb.  After proving the viability of a pure python
+implementation, I Frankenstiened my scapy btbb code on top of it to make
+the output look nice.  Keep in mind, Scapy is not pure python, so this addition
+is tainting my pure python codebase.
+
+Many of the concepts present here will be ported to my official python
+ubertooth libaries titled pyut.  If you are interested in utilizing this code, 
+here are some command line examples:
+
+To display ubertooth data as scapy btbb packets in std out:
+python pyut_alpha.py
+
+To display ubertooth btbb packet data from an ubertooth dump file:
+python pyut_alpha.py dump_filename.dump
+"""
+
 from scapy.packet import bind_layers, Packet
 from scapy.layers.l2 import Ether
 from scapy.fields import XBitField, BitField, XByteField, StrLenField

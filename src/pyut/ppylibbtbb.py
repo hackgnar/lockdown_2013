@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 DEFAULT_AC=0xcc7b7268ff614e1b
 
 DEFAULT_CODEWORD=0xb0000002c7820e7e
