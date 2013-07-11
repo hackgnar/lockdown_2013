@@ -89,8 +89,28 @@ def ubertooth_rx_to_file(outfile=None, channel=37, count=None, secs=None):
     ut.close()
 
 def CreateParser():
-    d = "Pure python interface to an ubertooth device"
-    parser = argparse.ArgumentParser(description=d)
+    d = """Description:
+A pure python interface to an ubertooth device.  This module can 
+be used as a stand alown script or as a python library to interact with an
+ubertooth.
+
+Sample usage:
+To log ubertooth data directly to a file (usable with ubertooth-rx -i filename):
+./pyut.py --outfile=dump_filename.dump
+
+To log ubertooth data directly to a file from bluetooth channel 60:
+./pyut.py --outfile=dump_filename.dump --channel 60
+
+To log 30 seconds worth of ubertooth data directly to a file :
+./pyut.py --outfile=dump_filename.dump -t 30
+
+To log 300 ubertooth usb data packets directly to a file :
+./pyut.py --outfile=dump_filename.dump -n 300
+
+To read raw ubertooth usb data from a dump file to std out:
+./pyut.py --infile=dump_filename.dump
+"""
+    parser = argparse.ArgumentParser(description=d, formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument("-n", type=int, default=None,
             help="how many usb packets to iterate before quiting")
