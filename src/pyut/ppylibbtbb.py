@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """
 This (ppylibbtbb.py) is a pure python implementation of libbtbb.  It serves as
 standalone run-able application or as a library for python applications.  It is
@@ -14,6 +13,9 @@ TODO:
     5) more code cleanup/refactor
     6) implement more c libbtbb features
 """
+
+from pyut import Ubertooth
+import argparse
 
 DEFAULT_AC=0xcc7b7268ff614e1b
 
@@ -413,6 +415,7 @@ class BtbbPacket(object):
 
     def _init_with_data(self, data):
         #TODO: change this to a BitVector. I was in a rush for lockdown con.
+        self.channel = data[2]
         self.air_bits = []
         for item in data:
             tmp = bin(item)[2:].zfill(8)
@@ -480,13 +483,57 @@ class BtbbPacket(object):
         return dict((f,getattr(self,f)) for f in self._fields)
 
     def __str__(self):
-        return str(self.to_dict())
+        #return str(self.to_dict())
+        return str(dict((k,v) for k,v in self.to_dict().iteritems() if v is not None))
 
-from pyut import Ubertooth
+def CreateParser():
+    d = """Description:
+A pure python implememtation of libbtbb.  This module can 
+be used as a stand alown script or as a python library to interact with an
+bluetooth baseband data.
 
-ut = Ubertooth()
-for i in ut.rx_stream(secs=30):
-    pkt = BtbbPacket(data=i)
-    if pkt.LAP:
-        print pkt
-ut.close()
+Sample usage:
+To log btbb data directly to std out from an ubertooth device:
+./ppylibbtbb
+
+To log btbb data directly to std out from an ubertooth device on channel 60:
+./pypylibbtbb --channel 60
+
+To log btbb data directly to std out from an ubertooth device for 30 seconds:
+./pyut.py --outfile=dump_filename.dump -t 30
+
+To read raw ubertooth usb data from a dump file to std out:
+./pyut.py --infile=dump_filename.dump
+"""
+    parser = argparse.ArgumentParser(description=d, formatter_class=argparse.RawTextHelpFormatter)
+
+    parser.add_argument("-n", type=int, default=None,
+            help="how many usb packets to iterate before quiting")
+    parser.add_argument("-t", type=int, default=None,
+            help="how many seconds to read from usb device or file")
+    parser.add_argument("--channel", type=int, default=37,
+            help="What bluetooth channel to listen on (1-79)")
+    parser.add_argument("--infile", type=str, default=None,
+            help="read packets from an ubertooth dump file")
+    return parser.parse_args()
+
+def main(infile=None, channel=37, count=None, secs=None):
+    if infile:
+        #file_to_stdout(infile=infile, count=count, secs=secs)
+        pass
+    else:
+        #ubertooth_rx_to_file(outfile=outfile, channel=channel, count=count, secs=secs)
+        ut = Ubertooth()
+        if channel != 37:
+            ut.set_channel(channel)
+        for i in ut.rx_stream(count=count, secs=secs):
+            pkt = BtbbPacket(data=i)
+            if pkt.LAP:
+                print pkt
+        ut.close()
+
+if __name__ == "__main__":
+    args = CreateParser()
+    main(infile=args.infile, channel=args.channel, count=args.n, secs=args.t)
+
+
