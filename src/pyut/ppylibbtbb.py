@@ -342,3 +342,136 @@ TYPE_NAMES = ["NULL", "POLL", "FHS", "DM1", "DH1/2-DH1", "HV1", "HV2/2-EV3",
         "EV4/2-EV5", "EV5/3-EV5", "DM5/2-DH5", "DH5/3-DH5"]
 
 pn = '0x83848D96BBCC54FC'
+
+
+syndrome_map = {}
+
+def gen_syndrome(codeword):
+    syndrome = codeword & int('0xffffffff', 16)
+    codeword >>= 32
+    syndrome ^= sw_check_table4[codeword & int('0xff', 16)]
+    codeword >>= 8
+    syndrome ^= sw_check_table5[codeword & int('0xff', 16)]
+    codeword >>= 8
+    syndrome ^= sw_check_table6[codeword & int('0xff', 16)]
+    codeword >>= 8
+    syndrome ^= sw_check_table7[codeword & int('0xff', 16)]
+    return syndrome
+ 
+
+def cycle(error, start, depth, codeword):
+    #print "cycle ran"
+    i = start
+    base = 1
+    depth -= 1;
+    while i < 58:
+        new_error = (base << i)
+        new_error |= error
+        if depth:
+            cycle(new_error, i+1, depth, codeword)
+        else:
+            syndrome = gen_syndrome(codeword ^ new_error)
+            syndrome_map[syndrome] = new_error
+        i += 1
+
+def gen_syndrome_map(bit_errors):
+    i = 1
+    while i <= bit_errors:
+        cycle(0,0,i,DEFAULT_AC)
+        i += 1
+
+gen_syndrome_map(max_ac_errors)
+
+class BtbbPacket(object):
+
+    def __init__(self, data=None):
+        self._fields = ["refcount", "flags", "channel", "UAP", "NAP", "LAP",
+                "packet_type", "packet_lt_addr", "packet_flags", "packet_hec",
+                "packet_header", "payload_header_length", "payload_header",
+                "payload_llid", "payload_flow", "payload_length", "payload",
+                "crc", "clock", "clkn", "ac_errors", "length", "symbols"]
+        for field in self._fields:
+            setattr(self, field, None)
+
+        if data:
+            self._init_with_data(data)
+
+    def _init_with_data(self, data):
+        #TODO: change this to a BitVector. I was in a rush for lockdown con.
+        self.air_bits = []
+        for item in data:
+            tmp = bin(item)[2:].zfill(8)
+            for i in tmp:
+                self.air_bits.append(i)
+        self.barker = self.btbb_find_ac(data[7])
+        self.detect_lap()
+   
+   
+    @staticmethod    
+    def count_bits(n):
+        foo = bin(n)[2:]
+        return foo.count('1')
+    
+    @staticmethod    
+    def btbb_find_ac(byte):
+        """not the best implementation, only looks at one rx data bank, does
+        not match ut c libs for all rx data banks.  Does match on ut c libs lap
+        hits when compairing nanoseconds. This implementation also has a direct
+        corilation with rx packet where ut c lib sends symbs/symbols.
+        
+        Also, I am consuming a byte here.  This was from my old ugly code"""
+        barker = bin(byte)[2:].zfill(8)[1:7]
+        barker = int(''.join(list(barker)[::-1]), 2)
+        return barker
+    
+    def detect_lap(self):
+        barker = self.barker
+        barker <<= 1
+        # if we append other symbol bank we dont need to subtract 63...
+        #for i in range(400 ):
+        for i in range(400 - 63):
+            barker >>= 1
+            some_bit = int(self.air_bits[63 + i]) << 6
+            barker |= some_bit
+            if BARKER_DISTANCE[barker] <= MAX_BARKER_ERRORS:
+                """next 2 lines replace UT C method air_to_host_64.
+                    we do want to totaly fip 64 consecutive bits."""
+                syncword = self.air_bits[i:i+64]
+                syncword.reverse()
+                syncword = int(''.join(syncword), 2)
+                corrected_barker = int(barker_correct[syncword >> 57], 16)
+                syncword = syncword & int('0x01ffffffffffffff', 16) | \
+                        corrected_barker
+                codeword = syncword ^ int(pn, 16)
+                syndrome = gen_syndrome(codeword) 
+                ac_errors=0
+                if (syndrome):
+                    errors = syndrome_map.get(syndrome, None)
+                    if errors != None:
+                        syncword ^= errors
+                        ac_errors = self.count_bits(errors)
+                        syndrome = 0
+                    else:
+                        ac_errors = 0xff
+                    if ac_errors <= max_ac_errors:
+                        lap = (syncword >> 34) & 0xffffff
+                        lap = hex(lap)[2:]
+                        lap = lap.replace('L','').zfill(6)
+                        self.LAP=lap
+                        offset = i
+                        break
+
+    def to_dict(self):
+        return dict((f,getattr(self,f)) for f in self._fields)
+
+    def __str__(self):
+        return str(self.to_dict())
+
+from pyut import Ubertooth
+
+ut = Ubertooth()
+for i in ut.rx_stream(secs=30):
+    pkt = BtbbPacket(data=i)
+    if pkt.LAP:
+        print pkt
+ut.close()
